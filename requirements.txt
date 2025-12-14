@@ -1,7 +1,7 @@
--e .[all]
--r requirements-tests.txt
--r requirements-docs.txt
--r requirements-translations.txt
-pre-commit >=4.5.0,<5.0.0
-# For generating screenshots
-playwright
+requests>=2.28.0
+qdrant-client>=1.6.0
+sentence-transformers>=2.2.0
+torch>=2.0.0
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.0.0
