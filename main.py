@@ -35,6 +35,16 @@ pipeline_state = {
 state_lock = threading.Lock()
 
 
+def get_volume_path():
+    """Get volume path at runtime (after Railway mounts it)."""
+    env_path = os.getenv("RAILWAY_VOLUME_MOUNT_PATH")
+    if env_path and os.path.exists(env_path):
+        return env_path
+    if os.path.exists("/fastapi-volume"):
+        return "/fastapi-volume"
+    return "."
+
+
 class PipelineStatus(BaseModel):
     status: str
     started_at: Optional[str]
@@ -61,6 +71,7 @@ def root():
             "/logs": "Get log file (GET, ?lines=100&log_type=pipeline|errors)",
             "/checkpoint": "View checkpoint status (GET)",
             "/clear-checkpoint": "Clear checkpoint to restart (POST)",
+            "/volume-info": "Check volume mount status (GET)",
             "/health": "Health check"
         }
     }
@@ -70,6 +81,21 @@ def root():
 def health():
     """Health check for Railway."""
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+
+
+@app.get("/volume-info")
+def volume_info():
+    """Check volume mount status for debugging."""
+    env_path = os.getenv("RAILWAY_VOLUME_MOUNT_PATH")
+    detected_path = get_volume_path()
+    
+    return {
+        "env_RAILWAY_VOLUME_MOUNT_PATH": env_path,
+        "detected_volume_path": detected_path,
+        "fastapi_volume_exists": os.path.exists("/fastapi-volume"),
+        "env_path_exists": os.path.exists(env_path) if env_path else False,
+        "files_in_volume": os.listdir(detected_path) if os.path.exists(detected_path) else []
+    }
 
 
 @app.get("/status", response_model=PipelineStatus)
@@ -109,15 +135,12 @@ def stop_pipeline():
     return {"message": "Stop requested", "status": "stopping"}
 
 
-# Volume path for Railway
-VOLUME_PATH = "/fastapi-volume" if os.path.exists("/fastapi-volume") else "."
-
-
 @app.get("/logs")
 def get_logs(lines: int = 100, log_type: str = "pipeline"):
     """Get recent log lines from volume storage."""
+    volume_path = get_volume_path()
     log_file = "rag_pipeline.log" if log_type == "pipeline" else "rag_errors.log"
-    log_path = os.path.join(VOLUME_PATH, log_file)
+    log_path = os.path.join(volume_path, log_file)
     
     try:
         if not os.path.exists(log_path):
@@ -138,7 +161,8 @@ def get_logs(lines: int = 100, log_type: str = "pipeline"):
 @app.get("/checkpoint")
 def get_checkpoint():
     """Get current checkpoint data (processed days)."""
-    checkpoint_path = os.path.join(VOLUME_PATH, "rag_checkpoint.json")
+    volume_path = get_volume_path()
+    checkpoint_path = os.path.join(volume_path, "rag_checkpoint.json")
     
     try:
         if not os.path.exists(checkpoint_path):
@@ -169,7 +193,8 @@ def get_checkpoint():
 @app.post("/clear-checkpoint")
 def clear_checkpoint():
     """Clear checkpoint to restart from beginning. USE WITH CAUTION."""
-    checkpoint_path = os.path.join(VOLUME_PATH, "rag_checkpoint.json")
+    volume_path = get_volume_path()
+    checkpoint_path = os.path.join(volume_path, "rag_checkpoint.json")
     
     try:
         if os.path.exists(checkpoint_path):

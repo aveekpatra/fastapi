@@ -60,8 +60,19 @@ MAX_RETRIES = 3
 RETRY_DELAY = 1
 
 # Resume configuration
-# Use Railway volume path if available, otherwise current directory
-VOLUME_PATH = "/fastapi-volume" if os.path.exists("/fastapi-volume") else "."
+# Use Railway volume from env var, or check if path exists, otherwise current directory
+VOLUME_PATH = os.getenv("RAILWAY_VOLUME_MOUNT_PATH", "/fastapi-volume" if os.path.exists("/fastapi-volume") else ".")
+
+def get_volume_path():
+    """Get volume path at runtime (after mount)."""
+    env_path = os.getenv("RAILWAY_VOLUME_MOUNT_PATH")
+    if env_path and os.path.exists(env_path):
+        return env_path
+    if os.path.exists("/fastapi-volume"):
+        return "/fastapi-volume"
+    return "."
+
+# These will be set at runtime in RAGPipeline.__init__
 CHECKPOINT_FILE = os.path.join(VOLUME_PATH, "rag_checkpoint.json")
 LOG_FILE = os.path.join(VOLUME_PATH, "rag_pipeline.log")
 ERROR_LOG_FILE = os.path.join(VOLUME_PATH, "rag_errors.log")
