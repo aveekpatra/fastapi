@@ -65,7 +65,7 @@ VOLUME_PATH = "/fastapi-volume" if os.path.exists("/fastapi-volume") else "."
 CHECKPOINT_FILE = os.path.join(VOLUME_PATH, "rag_checkpoint.json")
 LOG_FILE = os.path.join(VOLUME_PATH, "rag_pipeline.log")
 ERROR_LOG_FILE = os.path.join(VOLUME_PATH, "rag_errors.log")
-CHECKPOINT_FREQUENCY = 5  # Checkpoint every N days
+CHECKPOINT_FREQUENCY = 1  # Checkpoint every N days (1 = save after each day)
 
 
 # ============= LOGGING =============
