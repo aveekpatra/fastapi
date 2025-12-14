@@ -60,7 +60,11 @@ MAX_RETRIES = 3
 RETRY_DELAY = 1
 
 # Resume configuration
-CHECKPOINT_FILE = "rag_checkpoint.json"
+# Use Railway volume path if available, otherwise current directory
+VOLUME_PATH = "/fastapi-volume" if os.path.exists("/fastapi-volume") else "."
+CHECKPOINT_FILE = os.path.join(VOLUME_PATH, "rag_checkpoint.json")
+LOG_FILE = os.path.join(VOLUME_PATH, "rag_pipeline.log")
+ERROR_LOG_FILE = os.path.join(VOLUME_PATH, "rag_errors.log")
 CHECKPOINT_FREQUENCY = 5  # Checkpoint every N days
 
 
@@ -73,14 +77,14 @@ def setup_logging():
 
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 
-    # Full log
-    file_handler = logging.FileHandler("rag_pipeline.log", encoding="utf-8")
+    # Full log - use volume path
+    file_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
-    # Error log
-    error_handler = logging.FileHandler("rag_errors.log", encoding="utf-8")
+    # Error log - use volume path
+    error_handler = logging.FileHandler(ERROR_LOG_FILE, encoding="utf-8")
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(formatter)
     logger.addHandler(error_handler)
