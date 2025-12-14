@@ -58,6 +58,9 @@ def root():
             "/status": "Get pipeline status",
             "/start": "Start vectorization (POST)",
             "/stop": "Stop vectorization (POST)",
+            "/logs": "Get log file (GET, ?lines=100&log_type=pipeline|errors)",
+            "/checkpoint": "View checkpoint status (GET)",
+            "/clear-checkpoint": "Clear checkpoint to restart (POST)",
             "/health": "Health check"
         }
     }
@@ -104,6 +107,78 @@ def stop_pipeline():
         pipeline_state["status"] = "stopping"
     
     return {"message": "Stop requested", "status": "stopping"}
+
+
+# Volume path for Railway
+VOLUME_PATH = "/fastapi-volume" if os.path.exists("/fastapi-volume") else "."
+
+
+@app.get("/logs")
+def get_logs(lines: int = 100, log_type: str = "pipeline"):
+    """Get recent log lines from volume storage."""
+    log_file = "rag_pipeline.log" if log_type == "pipeline" else "rag_errors.log"
+    log_path = os.path.join(VOLUME_PATH, log_file)
+    
+    try:
+        if not os.path.exists(log_path):
+            return {"error": f"Log file not found at {log_path}", "volume_path": VOLUME_PATH}
+        
+        with open(log_path, "r", encoding="utf-8") as f:
+            content = f.readlines()
+            return {
+                "file": log_path,
+                "total_lines": len(content),
+                "showing_last": min(lines, len(content)),
+                "logs": content[-lines:]
+            }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/checkpoint")
+def get_checkpoint():
+    """Get current checkpoint data (processed days)."""
+    checkpoint_path = os.path.join(VOLUME_PATH, "rag_checkpoint.json")
+    
+    try:
+        if not os.path.exists(checkpoint_path):
+            return {
+                "exists": False,
+                "path": checkpoint_path,
+                "message": "No checkpoint file - pipeline will start from beginning"
+            }
+        
+        import json
+        with open(checkpoint_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        processed_days = data.get("processed_days", [])
+        return {
+            "exists": True,
+            "path": checkpoint_path,
+            "total_days_processed": len(processed_days),
+            "last_processed": max(processed_days) if processed_days else None,
+            "first_processed": min(processed_days) if processed_days else None,
+            "total_chunks": data.get("total_chunks", 0),
+            "sample_days": processed_days[-10:] if len(processed_days) > 10 else processed_days
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/clear-checkpoint")
+def clear_checkpoint():
+    """Clear checkpoint to restart from beginning. USE WITH CAUTION."""
+    checkpoint_path = os.path.join(VOLUME_PATH, "rag_checkpoint.json")
+    
+    try:
+        if os.path.exists(checkpoint_path):
+            os.remove(checkpoint_path)
+            return {"message": "Checkpoint cleared - pipeline will start from beginning"}
+        else:
+            return {"message": "No checkpoint file exists"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 def run_pipeline():
